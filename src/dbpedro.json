@@ -1,1 +1,0 @@
-"{\"messages\": [{\"id\": \"pedro\", \"message\": \"ola\"}, {\"id\": \"pedro\", \"message\": \"ola\"}], \"following\": [{\"id\": \"jose\", \"ip\": \"10.0.2.15\", \"port\": \"10\"}, {\"id\": \"manel\", \"ip\": \"10.0.2.15\", \"port\": \"89\"}, {\"id\": \"joao\", \"ip\": \"10.0.2.15\", \"port\": \"11\"}], \"vector_clock\": {\"pedro\": 0}}"
