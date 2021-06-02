@@ -4,11 +4,11 @@ import sys
 
 from kademlia.network import Server
 
-DEBUG = False 
+DEBUG = True 
 
 # starting a node
-def start_node(Port, BTIp="", BTPort=0): 
-    print(Port ," ", BTIp ," ", BTPort)
+def start_node(Port, BTPort=0): 
+    print(Port ," ", "127.0.0.1" ," ", BTPort)
     handler = logging.StreamHandler()
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     handler.setFormatter(formatter)
@@ -31,7 +31,7 @@ def start_node(Port, BTIp="", BTPort=0):
 
     # the first peer don't do that
     if not BTPort == 0:    
-        bootstrap_node = (BTIp, int(BTPort))
+        bootstrap_node = ("127.0.0.1", int(BTPort))
         loop.run_until_complete(server.bootstrap([bootstrap_node]))
-
+    
     return (server, loop)

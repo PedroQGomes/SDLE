@@ -88,7 +88,7 @@ def process_message(data, timeline, server, nickname, vector_clock):
     
 
 def update_vector_clock(server, n, id, vector_clock):
-    print('hei')
+    print('update do vector clock')
     try:
         vector_clock[id] += n
     except Exception:

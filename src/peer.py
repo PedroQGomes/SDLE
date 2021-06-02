@@ -1,4 +1,5 @@
 from asyncio.futures import Future
+from asyncio.tasks import sleep
 import logging, asyncio, sys, socket, json, threading, random
 from threading import Thread
 import traceback
@@ -94,8 +95,8 @@ def exit_loop():
 
 # start peer or not as Bootstrap
 def start():
-    if len(sys.argv) > 3:
-        return node.start_node(int(sys.argv[1]), sys.argv[3], int(sys.argv[4]))
+    if len(sys.argv) > 2:
+        return node.start_node(int(sys.argv[1]),int(sys.argv[3]))
     else:
         return node.start_node(int(sys.argv[1]))
 
@@ -168,6 +169,7 @@ async def build_user_info():
         info = builder.user_info(nickname, ip_address, p2p_port)
         vector_clock[nickname] = 0
         asyncio.ensure_future(server.set(nickname, info))
+        
 
 
 # Get user real ip
