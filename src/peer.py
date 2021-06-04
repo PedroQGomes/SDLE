@@ -3,16 +3,13 @@ from asyncio.tasks import sleep
 import logging, asyncio, sys, socket, json, threading, random
 from threading import Thread
 import traceback
-#from Menu.MenuFunctionalities import build_menu, get_nickname, follow_user, show_timeline, send_msg, exit_loop
-#from async_tasks import task, task_follow, task_send_msg, get_followers_p2p
-from LocalStorage import local_storage
-from DHT import node
 from P2P.Connection import Connection
 from Menu.Menu import Menu
 import Menu.Menu as menu
 from Menu.Item import Item
 import async_tasks
 import builder
+from kademlia.network import Server
 
 
 try:
@@ -30,7 +27,9 @@ ip_address = ""
 timeline = []
 following = []
 vector_clock = {}
-db_file = 'db'
+DEBUG = False 
+
+
 
 
 # handler process IO request
@@ -45,9 +44,13 @@ def build_menu():
     menu.add_item(Item('1 - Show timeline', show_timeline))
     menu.add_item(Item('2 - Follow username', follow_user))
     menu.add_item(Item('3 - Send message', send_msg))
+    menu.add_item(Item('4 - Show folowing', get_folowing))
     menu.add_item(Item('0 - Exit', exit_loop))
     return menu
 
+def get_folowing():
+    print(following)
+    return False
 
 # get the nickname
 def get_nickname():
@@ -81,7 +84,7 @@ def send_msg():
     msg = input('Insert message: ')
     msg = msg.replace('\n','')
     timeline.append({'id': nickname, 'message': msg})
-    print(msg)
+    #print(msg)
     result = builder.simple_msg(msg, nickname)
     asyncio.ensure_future(async_tasks.task_send_msg(result, server, nickname, vector_clock))
 
@@ -93,56 +96,12 @@ def exit_loop():
     return True
 
 
-# start peer or not as Bootstrap
-def start():
-    if len(sys.argv) > 2:
-        return node.start_node(int(sys.argv[1]),int(sys.argv[3]))
-    else:
-        return node.start_node(int(sys.argv[1]))
-
-
 # check if the number of args is valid
 def check_argv():
     if len(sys.argv) < 3:
-        print("Usage: python get.py <port_dht> <port_p2p> [<bootstrap ip> <bootstrap port>]")
+        print("Usage: python peer.py <port_dht> <port_p2p> <bootstrap port>")
         sys.exit(1)
 
-
-# get timeline to the followings TODO
-async def get_timeline():
-    for user in following:
-        result = await server.get(user['id'])
-        result2 = await server.get(nickname)
-        if result is not None and result2 is not None:
-            userInfo = json.loads(result)
-            ownInfo = json.loads(result2)
-            random_follower, n = await get_random_updated_follower(user, userInfo, ownInfo)
-            if random_follower is not None:
-                ask_for_timeline(random_follower[0], random_follower[1], user['id'], n)
-            
-
-
-# temos de implementar o XOR
-async def get_random_updated_follower(user, userInfo, ownInfo):
-    print("RANDOM FOLLOWER")
-    id = user['id']
-    user_followers = userInfo['followers']
-    while(user_followers):
-        random_follower = random.choice(list(user_followers.keys()))
-        random_follower_con = userInfo['followers'][random_follower]
-        info = random_follower_con.split()
-        print(userInfo['vector_clock'])
-        print(vector_clock)
-        if userInfo['vector_clock'][id] > vector_clock[id] and random_follower != nickname and async_tasks.isOnline(info[0], int(info[1])):
-        #if random_follower != nickname and async_tasks.isOnline(info[0], int(info[1])):
-            print("FOUND")
-            return info, int(userInfo['vector_clock'][id]) - vector_clock[id] 
-        user_followers.pop(random_follower)
-    print("FAILED")
-    if userInfo['vector_clock'][id] > vector_clock[id]:
-        return [user['ip'], user['port']], int(userInfo['vector_clock'][id]) - vector_clock[id] 
-    else:
-        return None, 0
 
 # send a message to a node asking for a specific timeline
 def ask_for_timeline(userIp, userPort, TLUser, n):
@@ -163,9 +122,8 @@ def check_vector_clocks():
 
 # build a json with user info and put it in the DHT
 async def build_user_info():
-    exists = await server.get(nickname) 
-    print(nickname)                                #check if user exists in DHT
-    if exists is None:
+    user = await server.get(nickname)                                #check if user exists in DHT
+    if user is None:
         info = builder.user_info(nickname, ip_address, p2p_port)
         vector_clock[nickname] = 0
         asyncio.ensure_future(server.set(nickname, info))
@@ -182,41 +140,72 @@ def get_ip_address():
 
 
 # put the peer in "Listen mode" for new connections
-def start_p2p_listenner(connection):
+def bind_p2p_listenner(connection):
     connection.bind()
     connection.listen(timeline, server, nickname, vector_clock)
 
+def start_p2p_listenner(ip_address,p2p_port):
+    connection = Connection(ip_address, int(p2p_port))
+    thread = Thread(target = bind_p2p_listenner, args = (connection, ))
+    thread.start()
+    return connection
 
-""" MAIN """
-if __name__ == "__main__":
-    check_argv()
-    p2p_port = sys.argv[2]
-    ip_address = get_ip_address()                                                           # Get ip address from user
-    (server, loop) = start()
-    try:
-        print('Peer is running...')
-        nickname = get_nickname()                                                           # Get nickname from user
+
+
+def init_node(Port, BTPort): 
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+    
+    # DEBUG
+    if DEBUG:
+        log = logging.getLogger('kademlia')
+        log.addHandler(handler)
+        log.setLevel(logging.DEBUG)
+
+    server = Server()
+
+
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(server.listen(Port))
+
+
+    if DEBUG:
+        loop.set_debug(True)
+
+    if not BTPort == 0:    
+        bootstrap_node = ("127.0.0.1", int(BTPort))
+        loop.run_until_complete(server.bootstrap([bootstrap_node]))
+    
+    return (server, loop)
+
+
+
+
+
+check_argv()
+p2p_port = sys.argv[2]
+ip_address = get_ip_address()                                                           # Get ip address from user
+(server, loop) = init_node(int(sys.argv[1]),int(sys.argv[3]))
+try:
+    print('Peer is running...')
+    nickname = get_nickname()                                                           # Get nickname from user
                                    
-        (timeline, following, vector_clock) = local_storage.read_data(db_file+nickname)     # TODO rm nickname (it's necessary for to allow tests in the same host
+    connection = start_p2p_listenner(ip_address,p2p_port)
 
-        connection = Connection(ip_address, int(p2p_port))
-        thread = Thread(target = start_p2p_listenner, args = (connection, ))
-        thread.start()
+    loop.add_reader(sys.stdin, handle_stdin)                                            # Register handler to read STDIN
+    asyncio.ensure_future(build_user_info())                                                    # Register in DHT user info
+    #asyncio.ensure_future(get_timeline())
 
-        loop.add_reader(sys.stdin, handle_stdin)                                            # Register handler to read STDIN
-        asyncio.ensure_future(build_user_info())                                                    # Register in DHT user info
-        asyncio.ensure_future(get_timeline())
-
-        m = build_menu()
-        asyncio.ensure_future(async_tasks.task(server, loop, nickname, m, queue))                   # Register handler to consume the queue
-        loop.run_forever()                                                                  # Keeps the user online
-    except Exception:
-        traceback.print_exc()
-        pass
-    finally:
-        print('Good Bye!')
-        local_storage.save_data(timeline, following, vector_clock, db_file+nickname)        # TODO rm nickname
-        connection.stop()                                                                   # stop thread in "listen mode"
-        server.stop()                                                                       # Stop the server with DHT Kademlia
-        loop.close()                                                                        # Stop the async loop
-        sys.exit(1)                                                      
+    m = build_menu()
+    asyncio.ensure_future(async_tasks.task(server, loop, nickname, m, queue))                   # Register handler to consume the queue
+    loop.run_forever()                                                                  # Keeps the user online
+except Exception:
+    traceback.print_exc()
+    pass
+finally:
+    print('Shuting down server!')
+    connection.stop()                                                                   # stop thread in "listen mode"
+    server.stop()                                                                       # Stop the server with DHT Kademlia
+    loop.close()                                                                        # Stop the async loop
+    sys.exit(1)                                                      

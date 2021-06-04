@@ -7,6 +7,7 @@ def task(server, loop, nickname, menu, queue):
     menu.draw()
     while True:
         msg = yield from queue.get()
+        print(msg)
         if not msg == '\n' and menu.run(int(msg)):
             break
         menu.draw()
@@ -41,7 +42,7 @@ async def get_followers_p2p(server, nickname, vector_clock):
         print('ERROR - Why don\'t I belong to the DHT?')
     else:
         userInfo = json.loads(result)
-        print(userInfo)
+        #print(userInfo)
         userInfo['vector_clock'][nickname] += 1
         vector_clock[nickname] += 1
         asyncio.ensure_future(server.set(nickname, json.dumps(userInfo)))
