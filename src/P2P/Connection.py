@@ -1,5 +1,7 @@
 import socket, sys, threading, json, asyncio
 
+import flake 
+
 class Connection:
     def __init__(self, host, port):
         self.host = host
@@ -21,14 +23,14 @@ class Connection:
 
 
     # put the socket in "Listen" mode
-    def listen(self, timeline, server, nickname, vector_clock):
+    def listen(self, timeline, server, nickname, user_msg,following):
         self.sock.listen(1)
 
         #while not stop_event:
         while self.running:
             print('waiting for a connection')
             connection, client_address = self.sock.accept()
-            manager = threading.Thread(target=process_request, args=(connection, client_address, timeline, server, nickname, vector_clock))
+            manager = threading.Thread(target=process_request, args=(connection, client_address, timeline, server, nickname, user_msg,following))
             manager.start()
 
 
@@ -56,14 +58,14 @@ class Connection:
 
 
 # process the request, i.e., read the msg from socket (Thread)
-def process_request(connection, client_address, timeline, server, nickname, vector_clock):
+def process_request(connection, client_address, timeline, server, nickname, user_msg,following):
     try:
         print('connection from', client_address)
         while True:
             data = connection.recv(1024)
             if data:
                 print('received "%s"' % data.decode('utf-8'))
-                result = process_message(data, timeline, server, nickname, vector_clock)
+                result = process_message(data, timeline, server, nickname, user_msg,following)
                 connection.sendall(result)
             else:
                 break
@@ -71,28 +73,33 @@ def process_request(connection, client_address, timeline, server, nickname, vect
         connection.close()
 
 
-def process_message(data, timeline, server, nickname, vector_clock):
+def process_message(data, timeline, server, nickname, user_msg,following):
     info = json.loads(data)
+    print(info)
+    timestamp = flake.get_datetime_from_id(info['timeid'])
     if info['type'] == 'simple':
-        timeline.append({'id': info['id'], 'message': info['msg']})
-        update_vector_clock(server, 1, info['id'], vector_clock)
-        #asyncio.async(update_vector_clock(server, 1, nickname))
+        for follow in following:
+            
+            if follow['id'] == info['id']:
+
+                if info['user_msg'] == follow['user_msg'] + 1:
+                    print("boa msg")
+                    timeline.append({'timestamp':timestamp,'id': info['id'], 'message': info['msg'],'user_msg':info['user_msg']})
+                    return 'ACK'.encode('utf-8')
+                else:
+                    print("msg fora de hora")
+                    return 'ACK'.encode('utf-8')
+                    # dava queue a msg
+
+ 
         return 'ACK'.encode('utf-8')
     elif info['type'] == 'timeline':
         list = get_messages(info['id'], timeline, int(info['n']))
         di = {'type': 'timeline', 'list': json.dumps(list)}
-        update_vector_clock(server, len(list), info['id'], vector_clock)
-        #asyncio.async(update_vector_clock(server, len(list), nickname))
         res = json.dumps(di)
         return res.encode('utf-8')
     
 
-def update_vector_clock(server, n, id, vector_clock):
-    print('update do vector clock')
-    try:
-        vector_clock[id] += n
-    except Exception:
-        vector_clock[id] = n
 
 
 def get_messages(id, timeline, n):

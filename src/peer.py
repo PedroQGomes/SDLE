@@ -10,6 +10,8 @@ from Menu.Item import Item
 import async_tasks
 import builder
 from kademlia.network import Server
+import flake 
+from datetime import datetime
 
 
 try:
@@ -18,27 +20,24 @@ except ImportError:
     print("boasdnasd")
 
 
-
-# -- Global VARS --
 queue = asyncio.Queue()
 p2p_port = ""
 nickname = ""
 ip_address = ""
 timeline = []
 following = []
-vector_clock = {}
+user_msg = 0
 DEBUG = False 
 
 
 
 
-# handler process IO request
 def handle_stdin():
     data = sys.stdin.readline()
     asyncio.ensure_future(queue.put(data)) # Queue.put is a coroutine, so you can't call it directly.
 
 
-# build the Menu
+
 def build_menu():
     menu = Menu('Menu')
     menu.add_item(Item('1 - Show timeline', show_timeline))
@@ -52,41 +51,51 @@ def get_folowing():
     print(following)
     return False
 
-# get the nickname
+
 def get_nickname():
     nick = input('Nickname: ')
     return nick.replace('\n', '')
 
 
-# follow a user. After, he can be found in the list "following"
+
 def follow_user():
     user = input('User Nickname: ')
     user_id = user.replace('\n', '')
     print(server)
-    asyncio.ensure_future(async_tasks.task_follow(user_id, nickname, server, following, ip_address, p2p_port, vector_clock))
+    asyncio.ensure_future(async_tasks.task_follow(user_id, nickname, server, following, ip_address, p2p_port, user_msg))
     return False
 
 
 # show own timeline
 def show_timeline():
     menu.clear()
+
     print('_______________ Timeline _______________')
     for m in timeline:
-        print(m['id'] + ' - ' + m['message'])
+        data = datetime.strftime(m['timestamp'],'%Y-%m-%d %H:%M:%S')
+        print(data + ' - ' + m['id'] + ' - ' + m['message'] + ' - ' +m['user_msg'])
     print('________________________________________')
     input('Press Enter')
     menu.clear()
     return False
 
 
-# send message to the followers
 def send_msg():
+    msg_id = flake.generator(12).__next__()
+
+    time = flake.get_datetime_from_id(msg_id)
+    #print(msg_id)
+    #print(time)
     msg = input('Insert message: ')
     msg = msg.replace('\n','')
-    timeline.append({'id': nickname, 'message': msg})
+
+    global user_msg 
+    user_msg += 1
+    timeline.append({'timestamp':time,'id': nickname, 'message': msg,'user_msg':user_msg})
     #print(msg)
-    result = builder.simple_msg(msg, nickname)
-    asyncio.ensure_future(async_tasks.task_send_msg(result, server, nickname, vector_clock))
+    result = builder.simple_msg(msg, nickname,msg_id,user_msg)
+    print(result)
+    asyncio.ensure_future(async_tasks.task_send_msg(result, server, nickname))
 
     return False
 
@@ -96,41 +105,35 @@ def exit_loop():
     return True
 
 
-# check if the number of args is valid
+
 def check_argv():
     if len(sys.argv) < 3:
         print("Usage: python peer.py <port_dht> <port_p2p> <bootstrap port>")
         sys.exit(1)
 
 
-# send a message to a node asking for a specific timeline
 def ask_for_timeline(userIp, userPort, TLUser, n):
     msg = builder.timeline_msg(TLUser, vector_clock, n)
     async_tasks.send_p2p_msg(userIp, int(userPort), msg, timeline)
     print('ASKING FOR TIMELINE')
 
 
-# merge all timelines TODO
 def merge_timelines():
     print('TODO')
 
 
-# check a set of vector clocks TODO
 def check_vector_clocks():
     print('TODO')
 
 
-# build a json with user info and put it in the DHT
 async def build_user_info():
     user = await server.get(nickname)                                #check if user exists in DHT
     if user is None:
         info = builder.user_info(nickname, ip_address, p2p_port)
-        vector_clock[nickname] = 0
         asyncio.ensure_future(server.set(nickname, info))
-        
 
 
-# Get user real ip
+
 def get_ip_address():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.connect(("8.8.8.8", 80))
@@ -139,17 +142,15 @@ def get_ip_address():
     return ip
 
 
-# put the peer in "Listen mode" for new connections
 def bind_p2p_listenner(connection):
     connection.bind()
-    connection.listen(timeline, server, nickname, vector_clock)
+    connection.listen(timeline, server, nickname, user_msg,following)
 
 def start_p2p_listenner(ip_address,p2p_port):
     connection = Connection(ip_address, int(p2p_port))
     thread = Thread(target = bind_p2p_listenner, args = (connection, ))
     thread.start()
     return connection
-
 
 
 def init_node(Port, BTPort): 
@@ -188,14 +189,15 @@ p2p_port = sys.argv[2]
 ip_address = get_ip_address()                                                           # Get ip address from user
 (server, loop) = init_node(int(sys.argv[1]),int(sys.argv[3]))
 try:
+    connection = start_p2p_listenner(ip_address,p2p_port)
+
     print('Peer is running...')
     nickname = get_nickname()                                                           # Get nickname from user
-                                   
-    connection = start_p2p_listenner(ip_address,p2p_port)
+    user_msg = 0                         
+    
 
     loop.add_reader(sys.stdin, handle_stdin)                                            # Register handler to read STDIN
     asyncio.ensure_future(build_user_info())                                                    # Register in DHT user info
-    #asyncio.ensure_future(get_timeline())
 
     m = build_menu()
     asyncio.ensure_future(async_tasks.task(server, loop, nickname, m, queue))                   # Register handler to consume the queue
