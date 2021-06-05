@@ -55,14 +55,14 @@ async def task_send_msg(msg, server, nickname,timeline,myMessages):
     for follower in connection_info:
         #print(follower)
         info = follower.split()
-        send_p2p_msg(info[0], int(info[1]), msg,timeline,myMessages)
+        send_p2p_msg(info[0], int(info[1]), msg,timeline,myMessages,nickname)
 
 
-def send_p2p_msg(ip, port, message,timeline,myMessages):
+def send_p2p_msg(ip, port, message,timeline,myMessages,nickname):
     if isOnline(ip, port):
         connection = Connection(ip, port)
         connection.connect()
-        connection.send(message, timeline,myMessages)
+        connection.send(message, timeline,myMessages,nickname)
 
 
 # check if a node is online

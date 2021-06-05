@@ -42,7 +42,7 @@ class Connection:
 
 
     # send a message to the other peer
-    def send(self, msg,timeline,myMessages):
+    def send(self, msg,timeline,myMessages,nickname):
         try:
             self.sock.sendall(msg.encode('utf-8'))
 
@@ -54,12 +54,12 @@ class Connection:
                     print("repeat message")
                     arr = []
                     for message in myMessages:
-                        print(message['user_msg'])
-                        print(info['lastknown'])
+                        #print(message['user_msg'])
+                        #print(info['lastknown'])
                         if message['user_msg'] > info['lastknown']:
                             arr.append(message)
-                    str1 = builder.multiple_msg(arr)
-                    print(str1)
+                    str1 = builder.multiple_msg(arr,nickname)
+                    #print(str1)
                     self.sock.sendall(bytes(str1, 'utf-8'))    
         finally:
             print('closing socket')
@@ -96,6 +96,7 @@ def process_message(data, timeline, server, nickname, user_msg,following,client_
                 if info['user_msg'] == follow['user_msg'] + 1:
                     print("boa msg")
                     timestamp = flake.get_datetime_from_id(info['timeid'])
+                    follow['user_msg'] += 1
                     timeline.append({'timestamp':timestamp,'id': info['id'], 'message': info['msg'],'user_msg':info['user_msg']})
                     
                 else:
@@ -109,6 +110,11 @@ def process_message(data, timeline, server, nickname, user_msg,following,client_
         for m in info['arr']:
             m['timestamp'] = flake.get_datetime_from_id(m['msg_id'])
             timeline.append(m)
+
+        for follow in following:
+            if follow['id'] == info['id']:
+                follow['user_msg'] = info['arr'][-1]['user_msg']
+
         return 'ACK'.encode('utf-8')
             
 

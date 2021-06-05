@@ -15,8 +15,8 @@ def repeat_msg(user_number,msg_number):
     return json.dumps(simple_msg)
 
 
-def multiple_msg(arr):
-    simple_msg = {'type': 'mutiple','arr':arr}
+def multiple_msg(arr,nickname):
+    simple_msg = {'type': 'mutiple','id': nickname,'arr':arr}
     return json.dumps(simple_msg)
 
 def timeline_msg(id, vclock, n):
