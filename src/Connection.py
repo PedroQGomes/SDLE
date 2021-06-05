@@ -1,7 +1,7 @@
 import socket, sys, threading, json, asyncio
-
 import flake 
-
+import builder
+import traceback
 class Connection:
     def __init__(self, host, port):
         self.host = host
@@ -23,14 +23,14 @@ class Connection:
 
 
     # put the socket in "Listen" mode
-    def listen(self, timeline, server, nickname, user_msg,following):
+    def listen(self, timeline, server, nickname, user_msg,following,myMessages):
         self.sock.listen(1)
 
         #while not stop_event:
         while self.running:
             print('waiting for a connection')
             connection, client_address = self.sock.accept()
-            manager = threading.Thread(target=process_request, args=(connection, client_address, timeline, server, nickname, user_msg,following))
+            manager = threading.Thread(target=process_request, args=(connection, client_address, timeline, server, nickname, user_msg,following,myMessages))
             manager.start()
 
 
@@ -42,62 +42,79 @@ class Connection:
 
 
     # send a message to the other peer
-    def send(self, msg, timeline=None):
+    def send(self, msg,timeline,myMessages):
         try:
             self.sock.sendall(msg.encode('utf-8'))
 
             data = self.sock.recv(256)
-            print ('received "%s"' % data.decode('utf-8'))
+            print ('received1 "%s"' % data.decode('utf-8'))
             if not data.decode('utf-8') == 'ACK':
                 info = json.loads(data)
-                if info['type'] == 'timeline':
-                    record_messages(data, timeline)
+                if info['type'] == 'repeat':
+                    print("repeat message")
+                    arr = []
+                    for message in myMessages:
+                        print(message['user_msg'])
+                        print(info['lastknown'])
+                        if message['user_msg'] > info['lastknown']:
+                            arr.append(message)
+                    str1 = builder.multiple_msg(arr)
+                    print(str1)
+                    self.sock.sendall(bytes(str1, 'utf-8'))    
         finally:
             print('closing socket')
             self.sock.close()
 
 
 # process the request, i.e., read the msg from socket (Thread)
-def process_request(connection, client_address, timeline, server, nickname, user_msg,following):
+def process_request(connection, client_address, timeline, server, nickname, user_msg,following,myMessages):
     try:
         print('connection from', client_address)
         while True:
             data = connection.recv(1024)
             if data:
-                print('received "%s"' % data.decode('utf-8'))
-                result = process_message(data, timeline, server, nickname, user_msg,following)
+                print('received2 "%s"' % data.decode('utf-8'))
+                result = process_message(data, timeline, server, nickname, user_msg,following,client_address,connection,myMessages)
                 connection.sendall(result)
             else:
                 break
+    except Exception:
+        traceback.print_exc()
     finally:
         connection.close()
 
 
-def process_message(data, timeline, server, nickname, user_msg,following):
+def process_message(data, timeline, server, nickname, user_msg,following,client_address,connection,myMessages):
     info = json.loads(data)
     print(info)
-    timestamp = flake.get_datetime_from_id(info['timeid'])
     if info['type'] == 'simple':
+        print("simple message")
         for follow in following:
             
             if follow['id'] == info['id']:
 
                 if info['user_msg'] == follow['user_msg'] + 1:
                     print("boa msg")
+                    timestamp = flake.get_datetime_from_id(info['timeid'])
                     timeline.append({'timestamp':timestamp,'id': info['id'], 'message': info['msg'],'user_msg':info['user_msg']})
-                    return 'ACK'.encode('utf-8')
+                    
                 else:
                     print("msg fora de hora")
-                    return 'ACK'.encode('utf-8')
-                    # dava queue a msg
+                    return bytes(builder.repeat_msg(follow['user_msg'],info['user_msg']), 'utf-8')
 
  
         return 'ACK'.encode('utf-8')
-    elif info['type'] == 'timeline':
-        list = get_messages(info['id'], timeline, int(info['n']))
-        di = {'type': 'timeline', 'list': json.dumps(list)}
-        res = json.dumps(di)
-        return res.encode('utf-8')
+    elif info['type'] == 'mutiple':
+        print("multiple message")
+        for m in info['arr']:
+            m['timestamp'] = flake.get_datetime_from_id(m['msg_id'])
+            timeline.append(m)
+        return 'ACK'.encode('utf-8')
+            
+
+
+        
+
     
 
 

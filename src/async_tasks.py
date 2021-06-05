@@ -1,5 +1,5 @@
 import asyncio, json, socket
-from P2P.Connection import Connection
+from Connection import Connection
 
 # process all messages into the Queue
 @asyncio.coroutine
@@ -49,20 +49,20 @@ async def get_followers_p2p(server, nickname):
     return connection_info
 
 
-async def task_send_msg(msg, server, nickname):
+async def task_send_msg(msg, server, nickname,timeline,myMessages):
     connection_info = await get_followers_p2p(server, nickname)
     # print('CONNECTION INFO (Ip, Port)')
     for follower in connection_info:
         #print(follower)
         info = follower.split()
-        send_p2p_msg(info[0], int(info[1]), msg)
+        send_p2p_msg(info[0], int(info[1]), msg,timeline,myMessages)
 
 
-def send_p2p_msg(ip, port, message, timeline=None):
+def send_p2p_msg(ip, port, message,timeline,myMessages):
     if isOnline(ip, port):
         connection = Connection(ip, port)
         connection.connect()
-        connection.send(message, timeline)
+        connection.send(message, timeline,myMessages)
 
 
 # check if a node is online

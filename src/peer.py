@@ -3,7 +3,7 @@ from asyncio.tasks import sleep
 import logging, asyncio, sys, socket, json, threading, random
 from threading import Thread
 import traceback
-from P2P.Connection import Connection
+from Connection import Connection
 from Menu.Menu import Menu
 import Menu.Menu as menu
 from Menu.Item import Item
@@ -25,6 +25,7 @@ p2p_port = ""
 nickname = ""
 ip_address = ""
 timeline = []
+myMessages = []
 following = []
 user_msg = 0
 DEBUG = False 
@@ -73,7 +74,7 @@ def show_timeline():
     print('_______________ Timeline _______________')
     for m in timeline:
         data = datetime.strftime(m['timestamp'],'%Y-%m-%d %H:%M:%S')
-        print(data + ' - ' + m['id'] + ' - ' + m['message'] + ' - ' +m['user_msg'])
+        print(data + ' - ' + m['id'] + ' - ' + m['message'] + ' - ' + str(m['user_msg']))
     print('________________________________________')
     input('Press Enter')
     menu.clear()
@@ -92,10 +93,11 @@ def send_msg():
     global user_msg 
     user_msg += 1
     timeline.append({'timestamp':time,'id': nickname, 'message': msg,'user_msg':user_msg})
+    myMessages.append({'msg_id':msg_id,'id': nickname, 'message': msg,'user_msg':user_msg})
     #print(msg)
     result = builder.simple_msg(msg, nickname,msg_id,user_msg)
     print(result)
-    asyncio.ensure_future(async_tasks.task_send_msg(result, server, nickname))
+    asyncio.ensure_future(async_tasks.task_send_msg(result, server, nickname,timeline,myMessages))
 
     return False
 
@@ -118,13 +120,6 @@ def ask_for_timeline(userIp, userPort, TLUser, n):
     print('ASKING FOR TIMELINE')
 
 
-def merge_timelines():
-    print('TODO')
-
-
-def check_vector_clocks():
-    print('TODO')
-
 
 async def build_user_info():
     user = await server.get(nickname)                                #check if user exists in DHT
@@ -144,7 +139,7 @@ def get_ip_address():
 
 def bind_p2p_listenner(connection):
     connection.bind()
-    connection.listen(timeline, server, nickname, user_msg,following)
+    connection.listen(timeline, server, nickname, user_msg,following,myMessages)
 
 def start_p2p_listenner(ip_address,p2p_port):
     connection = Connection(ip_address, int(p2p_port))
