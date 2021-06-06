@@ -10,6 +10,10 @@ def simple_msg(msg, nickname,msg_id,user_msg):
     return json.dumps(simple_msg)
 
 
+def complex_msg(msg,conn):
+    simple_msg = {'type': 'complex', 'msg': msg,'conn':conn}
+    return json.dumps(simple_msg)
+
 def repeat_msg(user_number,msg_number):
     simple_msg = {'type': 'repeat', 'lastknown': user_number, 'currentmsg': msg_number}
     return json.dumps(simple_msg)

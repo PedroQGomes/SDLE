@@ -62,7 +62,6 @@ def get_nickname():
 def follow_user():
     user = input('User Nickname: ')
     user_id = user.replace('\n', '')
-    print(server)
     asyncio.ensure_future(async_tasks.task_follow(user_id, nickname, server, following, ip_address, p2p_port, user_msg))
     return False
 
