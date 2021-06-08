@@ -2,7 +2,7 @@ import asyncio, json, socket
 from Connection import Connection
 import builder
 
-MAX_CONN = 1
+MAX_CONN = 5
 # process all messages into the Queue
 @asyncio.coroutine
 def task(server, loop, nickname, menu, queue):
@@ -23,7 +23,7 @@ async def task_follow(user_id, nickname, server, following, ip_address, p2p_port
         print('That user doesn\'t exist!')
     else:
         userInfo = json.loads(result)
-        print(userInfo)
+        #print(userInfo)
         try:
             if userInfo['followers'][nickname]:
                 print('You\'re following him!')
@@ -53,7 +53,7 @@ async def get_followers_p2p(server, nickname):
 async def task_send_msg(msg, server, nickname,timeline,myMessages):
     connection_info = await get_followers_p2p(server, nickname)
     
-    if len(connection_info) < MAX_CONN:
+    if len(connection_info) <= MAX_CONN:
         for follower in connection_info:
             info = follower.split()
             send_p2p_msg(info[0], int(info[1]), msg,timeline,myMessages,nickname)
@@ -66,14 +66,14 @@ def redirect_alg(user_ids, msg,timeline,myMessages,nickname):
 
    
     for follower in range(MAX_CONN):
-        print('follower nr ', follower, 'and I will redirect to:')
+        #print('follower nr ', follower, 'and I will redirect to:')
         if int(users_done + len(user_ids)/MAX_CONN) < len(user_ids)-1:
             sub_list = [user_ids[index] for index in range(users_done, int(users_done+ len(user_ids)/MAX_CONN))]
         else:
             sub_list = [user_ids[index] for index in range(users_done, len(user_ids))]
             
         users_done += len(sub_list)
-        print(sub_list)
+        #print(sub_list)
 
         #tirar a info da simple_msg
         msg_complex = builder.complex_msg(msg, sub_list)

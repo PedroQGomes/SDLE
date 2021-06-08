@@ -44,12 +44,18 @@ def build_menu():
     menu.add_item(Item('1 - Show timeline', show_timeline))
     menu.add_item(Item('2 - Follow username', follow_user))
     menu.add_item(Item('3 - Send message', send_msg))
-    menu.add_item(Item('4 - Show folowing', get_folowing))
+    menu.add_item(Item('4 - Show following', get_folowing))
     menu.add_item(Item('0 - Exit', exit_loop))
     return menu
 
+
 def get_folowing():
-    print(following)
+    menu.clear()
+    print('_______________ Following _______________')
+    for f in following:
+        print('Nickname: ' + f['id'] + ' - ' + 'Ip: '+ f['ip'] + ' - ' + 'Port: '+ f['port'] + ' - ' + 'Nº Msg: '+ str(f['user_msg']))
+    print('________________________________________')
+    input('Press Enter')
     return False
 
 
@@ -95,7 +101,7 @@ def send_msg():
     myMessages.append({'msg_id':msg_id,'id': nickname, 'message': msg,'user_msg':user_msg})
     #print(msg)
     result = builder.simple_msg(msg, nickname,msg_id,user_msg)
-    print(result)
+    #print(result)
     asyncio.ensure_future(async_tasks.task_send_msg(result, server, nickname,timeline,myMessages))
 
     return False
